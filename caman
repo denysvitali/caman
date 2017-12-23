@@ -30,6 +30,12 @@ STOREDIR="$CAMANDIR/$STOREDIR_NAME"
 HOSTDIR="$STOREDIR/$HOST"
 DATEDIR=$(date +"%Y-%m-%d")
 
+bold=$(tput bold)
+bold_reset="\\033[2m"
+normal=$(tput sgr0)
+color_red=$(tput setaf 1)
+color_reset='\e[m'
+
 # Check cert authority directory exists
 if [[ ! -d "$CADIR" && "$CMD" != "create" ]]; then
     echo "Certificate authority directory does not exist"
@@ -78,6 +84,12 @@ function get_days {
     perl -nle 'print $1 if /^default_days\s+=\s+(\d+)\s*$/' "$CONFIG"
 }
 
+function get_ca_bits {
+    # Get the CA private key size from the config file
+    local CONFIG=$1
+    perl -nle 'print $1 if /^default_bits\s+=\s+(\d+)\s*$/' "$CONFIG"
+}
+
 function generate_crl {
     # Generate the CRL
     # OpenSSL arguments:
@@ -99,6 +111,11 @@ function split_ca {
     fi
 }
 
+function destroy_ca {
+    rm -rf $CADIR/{ca.crl.pem,ca.crt.pem,ca.key.pem,crlnumber,crlnumber.old,index.txt,serial,newcerts}
+    rm -rf "$STOREDIR"
+    echo "CA destroyed."
+}
 
 #
 # Commands
@@ -148,6 +165,7 @@ function command_init {
     # Set up supporting files and dirs
     mkdir "$CADIR/newcerts" "$STOREDIR" || exit 1
     touch "$CADIR/index.txt"
+    touch "$CADIR/index.txt.attr"
     echo '01' > "$CADIR/serial"
 
     # Get CA age
@@ -164,7 +182,8 @@ function command_init {
     #   -out "..."          Path to key
     #   4096                Number of bits
     echo "Generating CA private key..."
-    call_openssl_genrsa -aes256 -out "$CADIR/ca.key.pem" 4096
+    ca_bits=$(get_ca_bits "$CADIR/caconfig.cnf")
+    call_openssl_genrsa -aes256 -out "$CADIR/ca.key.pem" $ca_bits
     chmod 400 "$CADIR/ca.key.pem"
 
     # Different actions depending whether this is a root or intermediate CA
@@ -456,6 +475,21 @@ function command_create {
 
 }
 
+function command_destroy {
+    echo -en "${bold}${color_red}"
+    echo "WARNING: This command will destroy the CA and ALL of the generated certificates."
+    echo -en "${bold_reset}${color_reset}"
+    while true; do
+      read -p "Are you sure you want to continue? " yn
+      confirm_phrase="Yes, I understand the risks"
+      case $yn in
+          "$confirm_phrase" ) destroy_ca; break;;
+          [Nn]* ) echo "Back to the safe zone, CA wasn't deleted."; break;;
+          *) echo "Please answer with '$confirm_phrase', or No";
+      esac
+    done
+}
+
 #
 # Process command
 #
@@ -513,22 +547,29 @@ case "$CMD" in
         generate_crl
 
         ;;
-    
+
     create)
         command_create
 
         ;;
+
+    destroy)
+        command_destroy
+        ;;
+
     *)
         cat <<EOF
 Caman version $VERSION
 
 Usage:  caman init [ca:<path/to/root_ca>]
+        caman create
         caman new <hostname> [<alt> [<alt> [...]]]
         caman sign <hostname>
         caman renew <hostname>
         caman revoke <hostname>
         caman revoke ca:<path/to/intermediate_ca>
         caman crl
+        caman destroy
 EOF
 
         ;;
