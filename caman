@@ -514,7 +514,7 @@ case "$CMD" in
 
         ;;
     
-      create)
+    create)
         command_create
 
         ;;
