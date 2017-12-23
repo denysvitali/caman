@@ -304,7 +304,7 @@ function command_sign_host {
     #   req                 Command for CSR management
     #   -new                Generate a new CSR
     #   -sha256             Force OpenSSL to use SHA256
-    #   -newkey rsa:2048    Generate a new 2048 bit RSA private key
+    #   -newkey rsa:8192    Generate a new 8192 bit RSA private key
     #   -nodes              Do not encrypt the private key
     #   -keyout "..."       Path to save new key
     #   -out "..."          Path to save new CSR
@@ -312,7 +312,7 @@ function command_sign_host {
     # No need for CA password here
     echo "Creating CSR and private key..."
     call_openssl req -sha256 \
-        -newkey rsa:2048 -nodes -keyout "$CERTDIR/$HOST.key.pem" \
+        -newkey rsa:8192 -nodes -keyout "$CERTDIR/$HOST.key.pem" \
         -new -out "$CERTDIR/$HOST.csr" \
         -config "$HOSTDIR/config.cnf" -batch
 
